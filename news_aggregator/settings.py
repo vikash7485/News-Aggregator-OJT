@@ -28,6 +28,10 @@ ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.replace(',', ' ').sp
 if '.onrender.com' not in ' '.join(ALLOWED_HOSTS):
     ALLOWED_HOSTS.append('.onrender.com')
 
+# Ensure .vercel.app wildcard is always included for Vercel deployments
+if '.vercel.app' not in ' '.join(ALLOWED_HOSTS):
+    ALLOWED_HOSTS.append('.vercel.app')
+
 # NewsAPI removed - using local RSS feeds only
 
 
@@ -79,21 +83,14 @@ WSGI_APPLICATION = 'news_aggregator.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Database configuration
-DATABASE_URL = config('DATABASE_URL', default=None)
-
-if DATABASE_URL:
-    # Production: Use PostgreSQL from DATABASE_URL
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
+# Using SQLite for Django ORM (models: News, Category, SavedArticle)
+# MongoDB is used separately for data syncing via signals
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    # Development: Use SQLite
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 
 # Password validation

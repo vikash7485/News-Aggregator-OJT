@@ -13,11 +13,4 @@ services:
         value: news-aggregator-ojtt.onrender.com
       - key: MONGODB_URL
         value: mongodb+srv://vikash:vikash%40123@cluster0.cz6joof.mongodb.net/?appName=Cluster0
-      - key: DATABASE_URL
-        fromDatabase:
-          name: news-aggregator-db
-          property: connectionString
-  - type: pg
-    name: news-aggregator-db
-    plan: free
 
