@@ -36,7 +36,13 @@ def home(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    categories = Category.objects.all().order_by('name')
+    # Ensure default categories exist (create if they don't)
+    default_categories = ['Technology', 'Sports', 'World']
+    for cat_name in default_categories:
+        Category.objects.get_or_create(name=cat_name)
+    
+    # Only show Technology, Sports, and World categories
+    categories = Category.objects.filter(name__in=default_categories).order_by('name')
     
     # Check which articles are saved by the user
     saved_news_ids = []
