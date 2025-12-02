@@ -85,12 +85,23 @@ WSGI_APPLICATION = 'news_aggregator.wsgi.application'
 # Database configuration
 # Using SQLite for Django ORM (models: News, Category, SavedArticle)
 # MongoDB is used separately for data syncing via signals
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+
+# Check if running on Vercel (no SQLite support)
+import os
+if os.environ.get('VERCEL') or os.environ.get('VERCEL_BUILD'):
+    # Vercel doesn't support SQLite - use dummy database backend for build
+    DATABASES = {
+        'default': {
+            'ENGINE': 'news_aggregator.dummy_db',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation

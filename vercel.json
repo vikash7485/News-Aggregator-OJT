@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "buildCommand": "pip install -r requirements.txt && python manage.py collectstatic --noinput",
+    "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
     "routes": [
         {
             "src": "/static/(.*)",
