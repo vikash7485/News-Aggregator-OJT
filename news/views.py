@@ -27,15 +27,10 @@ def home(request):
         thread.start()
         request._fetch_triggered = True
     
-    category_id = request.GET.get('category')
     search_query = request.GET.get('q')
     
-    # Start with all news from local DB
+    # Get all news from local DB (no category filtering)
     news_list = News.objects.all()
-    
-    # Apply category filter if provided
-    if category_id:
-        news_list = news_list.filter(category_id=category_id)
     
     # Handle search query - search local database only
     if search_query:
@@ -52,14 +47,6 @@ def home(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Ensure default categories exist (create if they don't)
-    default_categories = ['Technology', 'Sports', 'World']
-    for cat_name in default_categories:
-        Category.objects.get_or_create(name=cat_name)
-    
-    # Only show Technology, Sports, and World categories
-    categories = Category.objects.filter(name__in=default_categories).order_by('name')
-    
     # Check which articles are saved by the user
     saved_news_ids = []
     if request.user.is_authenticated:
@@ -67,9 +54,7 @@ def home(request):
 
     context = {
         'page_obj': page_obj,
-        'categories': categories,
         'saved_news_ids': saved_news_ids,
-        'selected_category': int(category_id) if category_id else None
     }
     return render(request, 'news/home.html', context)
 

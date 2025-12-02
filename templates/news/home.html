@@ -10,16 +10,6 @@
     </div>
 </div>
 
-<!-- Category Filter -->
-<div class="mb-4">
-    <a href="{% url 'home' %}"
-        class="btn {% if not selected_category %}btn-dark{% else %}btn-outline-dark{% endif %} me-2 mb-2">All</a>
-    {% for cat in categories %}
-    <a href="?category={{ cat.id }}"
-        class="btn {% if selected_category == cat.id %}btn-dark{% else %}btn-outline-dark{% endif %} me-2 mb-2">{{ cat.name }}</a>
-    {% endfor %}
-</div>
-
 <div class="row row-cols-1 row-cols-md-3 g-4">
     {% for news in page_obj %}
     <div class="col">
@@ -30,9 +20,6 @@
                  loading="lazy">
             {% endif %}
             <div class="card-body">
-                {% if news.category %}
-                <span class="badge bg-secondary category-badge">{{ news.category.name }}</span>
-                {% endif %}
                 <h5 class="card-title">
                     <a href="{{ news.link }}" target="_blank" class="text-decoration-none" style="color: var(--text-primary);">{{ news.title }}</a>
                 </h5>
@@ -74,7 +61,7 @@
         {% if page_obj.has_previous %}
         <li class="page-item">
             <a class="page-link"
-                href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Previous</a>
+                href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Previous</a>
         </li>
         {% endif %}
 
@@ -85,7 +72,7 @@
         {% if page_obj.has_next %}
         <li class="page-item">
             <a class="page-link"
-                href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Next</a>
+                href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Next</a>
         </li>
         {% endif %}
     </ul>
