@@ -4,8 +4,9 @@ from bs4 import BeautifulSoup
 from django.core.management.base import BaseCommand
 from django.utils.timezone import make_aware
 from datetime import datetime
-from time import mktime
+from time import mktime, sleep
 from news.models import News, Category
+from django.db import transaction
 import re
 
 class Command(BaseCommand):
@@ -13,6 +14,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         self.stdout.write("Starting RSS fetch...")
+        
+        # Track success by category
+        category_counts = {}
         
         rss_feeds = [
             # World News Sources (multiple to get 50+ articles)
@@ -49,8 +53,26 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"No entries found for {source}"))
                     continue
 
-                for entry in feed.entries[:20]: # Fetch up to 20 articles per feed (reduced for faster initial fetch)
-                    if News.objects.filter(link=entry.link).exists():
+                article_count = 0
+                for entry in feed.entries[:20]: # Fetch up to 20 articles per feed
+                    # Check if article already exists (with retry for database locking)
+                    max_retries = 3
+                    retry_count = 0
+                    article_exists = False
+                    
+                    while retry_count < max_retries:
+                        try:
+                            article_exists = News.objects.filter(link=entry.link).exists()
+                            break
+                        except Exception as e:
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                sleep(0.1 * retry_count)  # Exponential backoff
+                            else:
+                                self.stdout.write(self.style.WARNING(f"Database error checking article: {str(e)}"))
+                                break
+                    
+                    if article_exists:
                         continue
                     
                     # Date parsing
@@ -62,7 +84,7 @@ class Command(BaseCommand):
                         except Exception:
                             pub_date = None
                     
-                    # Image extraction (comprehensive)
+                    # Image extraction (simplified for faster fetching)
                     image_url = None
                     
                     # Method 1: Try media_content (RSS media extensions)
@@ -76,113 +98,81 @@ class Command(BaseCommand):
                     if not image_url and 'media_thumbnail' in entry and len(entry.media_thumbnail) > 0:
                         image_url = entry.media_thumbnail[0].get('url', '')
                     
-                    # Method 3: Check links for image types
-                    if not image_url and 'links' in entry:
-                        for link in entry.links:
-                            if link.get('type', '').startswith('image/'):
-                                image_url = link.get('href', '')
-                                break
-                    
-                    # Method 4: Extract from summary/description HTML
+                    # Method 3: Extract from summary/description HTML
                     if not image_url and 'summary' in entry:
                         img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', entry.summary)
                         if img_match:
                             image_url = img_match.group(1)
                     
-                    # Method 5: Extract from content if available
-                    if not image_url and 'content' in entry:
-                        for content_item in entry.content:
-                            img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', content_item.value)
-                            if img_match:
-                                image_url = img_match.group(1)
+                    # Create article with retry logic for database locking
+                    retry_count = 0
+                    created = False
+                    while retry_count < max_retries and not created:
+                        try:
+                            with transaction.atomic():
+                                News.objects.create(
+                                    title=entry.title[:500],
+                                    link=entry.link,
+                                    image=image_url,
+                                    description=entry.get('summary', '')[:500] if entry.get('summary') else '',
+                                    pub_date=pub_date,
+                                    source=source,
+                                    category=category,
+                                    guid=entry.get('id', entry.link)
+                                )
+                            created = True
+                            article_count += 1
+                        except Exception as e:
+                            retry_count += 1
+                            if 'locked' in str(e).lower() or 'database' in str(e).lower():
+                                if retry_count < max_retries:
+                                    sleep(0.2 * retry_count)  # Wait longer for database locks
+                                else:
+                                    self.stdout.write(self.style.WARNING(f"Failed to create article after {max_retries} retries: {str(e)}"))
+                            else:
+                                # Other errors, don't retry
                                 break
                     
-                    # Method 6: Fetch from article page (for TechCrunch, ESPN, etc.)
-                    # Skip this on first run to speed up - can be done later
-                    if not image_url and entry.link and False:  # Disabled for faster initial fetch
-                        try:
-                            # Fetch the article page
-                            headers = {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                            }
-                            response = requests.get(entry.link, headers=headers, timeout=3)
-                            if response.status_code == 200:
-                                soup = BeautifulSoup(response.content, 'html.parser')
-                                
-                                # Try Open Graph image (og:image)
-                                og_image = soup.find('meta', property='og:image')
-                                if og_image and og_image.get('content'):
-                                    image_url = og_image['content']
-                                
-                                # Try Twitter card image
-                                if not image_url:
-                                    twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
-                                    if twitter_image and twitter_image.get('content'):
-                                        image_url = twitter_image['content']
-                                
-                                # Try article image meta tag
-                                if not image_url:
-                                    article_image = soup.find('meta', attrs={'name': 'article:image'})
-                                    if article_image and article_image.get('content'):
-                                        image_url = article_image['content']
-                                
-                                # Try to find first large image in article
-                                if not image_url:
-                                    # Look for images with common article image classes
-                                    img_tags = soup.find_all('img', class_=re.compile(r'article|feature|hero|main|content', re.I))
-                                    if img_tags:
-                                        for img in img_tags:
-                                            src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
-                                            if src and not src.startswith('data:'):
-                                                # Make absolute URL if relative
-                                                if src.startswith('//'):
-                                                    image_url = 'https:' + src
-                                                elif src.startswith('/'):
-                                                    from urllib.parse import urljoin
-                                                    image_url = urljoin(entry.link, src)
-                                                else:
-                                                    image_url = src
-                                                break
-                                    
-                                    # Fallback: find largest image
-                                    if not image_url:
-                                        all_imgs = soup.find_all('img')
-                                        largest_img = None
-                                        max_size = 0
-                                        for img in all_imgs:
-                                            src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
-                                            if src and not src.startswith('data:'):
-                                                width = int(img.get('width', 0) or 0)
-                                                height = int(img.get('height', 0) or 0)
-                                                size = width * height
-                                                if size > max_size and size > 10000:  # At least 100x100
-                                                    max_size = size
-                                                    largest_img = src
-                                        
-                                        if largest_img:
-                                            if largest_img.startswith('//'):
-                                                image_url = 'https:' + largest_img
-                                            elif largest_img.startswith('/'):
-                                                from urllib.parse import urljoin
-                                                image_url = urljoin(entry.link, largest_img)
-                                            else:
-                                                image_url = largest_img
-                        except Exception as e:
-                            # Silently fail - article page might not be accessible
-                            pass
-                    
-                    News.objects.create(
-                        title=entry.title[:500],
-                        link=entry.link,
-                        image=image_url,
-                        description=entry.get('summary', '')[:500],
-                        pub_date=pub_date,
-                        source=source,
-                        category=category,
-                        guid=entry.get('id', entry.link)
-                    )
+                    # Small delay between articles to reduce database contention
+                    if article_count % 5 == 0:
+                        sleep(0.1)
+                
+                if article_count > 0:
+                    self.stdout.write(self.style.SUCCESS(f"✅ Fetched {article_count} articles from {source}"))
+                    # Track category counts
+                    if category_name not in category_counts:
+                        category_counts[category_name] = 0
+                    category_counts[category_name] += article_count
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f"Failed to fetch {source}: {str(e)}"))
+                error_msg = str(e)
+                if 'locked' in error_msg.lower():
+                    self.stdout.write(self.style.WARNING(f"⚠️ Database locked for {source}, will retry later. Error: {error_msg}"))
+                else:
+                    self.stdout.write(self.style.WARNING(f"⚠️ Failed to fetch {source}: {error_msg}"))
+                # Continue with next feed even if one fails
                 continue
+                # Small delay before next feed
+                sleep(0.5)
 
-        self.stdout.write(self.style.SUCCESS('Successfully fetched RSS news'))
+        # Summary
+        total_articles = News.objects.count()
+        self.stdout.write(self.style.SUCCESS(f'\n✅ RSS fetch completed!'))
+        self.stdout.write(self.style.SUCCESS(f'Total articles in database: {total_articles}'))
+        
+        if category_counts:
+            self.stdout.write(self.style.SUCCESS('\nArticles by category:'))
+            for category, count in category_counts.items():
+                self.stdout.write(self.style.SUCCESS(f'  - {category}: {count} articles'))
+        
+        # Verify all categories have articles
+        from news.models import Category
+        all_categories = Category.objects.all()
+        missing_categories = []
+        for cat in all_categories:
+            cat_count = News.objects.filter(category=cat).count()
+            if cat_count == 0:
+                missing_categories.append(cat.name)
+        
+        if missing_categories:
+            self.stdout.write(self.style.WARNING(f'\n⚠️ Categories with no articles: {", ".join(missing_categories)}'))
+            self.stdout.write(self.style.WARNING('You may want to run this command again to fetch articles for these categories.'))

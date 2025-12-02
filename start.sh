@@ -11,10 +11,14 @@ ARTICLE_COUNT=$(python manage.py shell -c "from news.models import News; print(N
 
 if [ "$ARTICLE_COUNT" = "0" ]; then
     echo "No articles found. Will fetch in background after server starts..."
-    # Start fetch in background (will run after gunicorn starts)
-    (sleep 5 && python manage.py fetch_feeds > /tmp/fetch_feeds.log 2>&1) &
+    # Start fetch in background (wait longer for server to fully start)
+    (sleep 10 && python manage.py fetch_feeds >> /tmp/fetch_feeds.log 2>&1 && echo "Fetch completed at $(date)" >> /tmp/fetch_feeds.log) &
     FETCH_PID=$!
-    echo "Background fetch scheduled (PID: $FETCH_PID)"
+    echo "Background fetch scheduled (PID: $FETCH_PID). Check /tmp/fetch_feeds.log for progress."
+else
+    echo "Found $ARTICLE_COUNT articles. Checking if we need to update..."
+    # Even if articles exist, fetch new ones periodically (but don't block)
+    (sleep 30 && python manage.py fetch_feeds >> /tmp/fetch_feeds.log 2>&1) &
 fi
 
 # Start gunicorn as main process (Render needs this to be the main process)
