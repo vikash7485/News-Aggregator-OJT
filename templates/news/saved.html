@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1 class="mb-4">My Saved Articles</h1>
+
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for item in page_obj %}
+    <div class="col">
+        <div class="card h-100 news-card">
+            {% if item.news.image and item.news.image.strip %}
+            <img src="{{ item.news.image }}" class="card-img-top" alt="{{ item.news.title }}"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'220\'%3E%3Crect width=\'400\' height=\'220\' fill=\'%23f5f5f5\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' font-family=\'Arial\' font-size=\'14\' fill=\'%23999\' text-anchor=\'middle\' dominant-baseline=\'middle\'%3EImage not available%3C/text%3E%3C/svg%3E';"
+                 loading="lazy">
+            {% endif %}
+            <div class="card-body">
+                {% if item.news.category %}
+                <span class="badge bg-secondary category-badge">{{ item.news.category.name }}</span>
+                {% endif %}
+                <h5 class="card-title"><a href="{{ item.news.link }}" target="_blank"
+                        class="text-decoration-none" style="color: var(--text-primary);">{{ item.news.title }}</a></h5>
+                <p class="card-text text-muted"><small>{{ item.news.source }} - {{ item.news.pub_date|date:"M d, Y H:i"
+                        }}</small></p>
+                <p class="card-text">{{ item.news.description|truncatewords:30 }}</p>
+                <p class="card-text"><small class="text-muted">Saved on: {{ item.saved_date|date:"M d, Y" }}</small></p>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ item.news.link }}" target="_blank" class="btn btn-sm btn-outline-dark">Read More</a>
+                    <a href="{% url 'toggle_save' item.news.id %}" class="btn btn-sm btn-dark">Remove</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p class="text-center">You haven't saved any articles yet.</p>
+        <div class="text-center">
+            <a href="{% url 'home' %}" class="btn btn-dark">Browse News</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        </li>
+        {% endif %}
+
+        <li class="page-item disabled">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endblock %}

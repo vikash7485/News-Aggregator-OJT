@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>Latest News</h1>
+        {% if request.GET.q %}
+        <p class="text-muted">Search results for: <strong>{{ request.GET.q }}</strong></p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Category Filter -->
+<div class="mb-4">
+    <a href="{% url 'home' %}"
+        class="btn {% if not selected_category %}btn-dark{% else %}btn-outline-dark{% endif %} me-2 mb-2">All</a>
+    {% for cat in categories %}
+    <a href="?category={{ cat.id }}"
+        class="btn {% if selected_category == cat.id %}btn-dark{% else %}btn-outline-dark{% endif %} me-2 mb-2">{{ cat.name }}</a>
+    {% endfor %}
+</div>
+
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for news in page_obj %}
+    <div class="col">
+        <div class="card h-100 news-card">
+            {% if news.image and news.image.strip %}
+            <img src="{{ news.image }}" class="card-img-top" alt="{{ news.title }}" 
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'220\'%3E%3Crect width=\'400\' height=\'220\' fill=\'%23f5f5f5\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' font-family=\'Arial\' font-size=\'14\' fill=\'%23999\' text-anchor=\'middle\' dominant-baseline=\'middle\'%3EImage not available%3C/text%3E%3C/svg%3E';"
+                 loading="lazy">
+            {% endif %}
+            <div class="card-body">
+                {% if news.category %}
+                <span class="badge bg-secondary category-badge">{{ news.category.name }}</span>
+                {% endif %}
+                <h5 class="card-title">
+                    <a href="{{ news.link }}" target="_blank" class="text-decoration-none" style="color: var(--text-primary);">{{ news.title }}</a>
+                </h5>
+                <p class="card-text text-muted">
+                    <small>{{ news.source|default:"Unknown" }} - {% if news.pub_date %}{{ news.pub_date|date:"M d, Y H:i" }}{% else %}Date not available{% endif %}</small>
+                </p>
+                <p class="card-text">{{ news.description|truncatewords:30|default:"No description available" }}</p>
+            </div>
+            <div class="card-footer bg-transparent border-top-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ news.link }}" target="_blank" class="btn btn-sm btn-outline-dark">Read More</a>
+                    {% if user.is_authenticated %}
+                    {% if news.id in saved_news_ids %}
+                    <a href="{% url 'toggle_save' news.id %}" class="btn btn-sm btn-dark">Unsave</a>
+                    {% else %}
+                    <a href="{% url 'toggle_save' news.id %}" class="btn btn-sm btn-outline-dark">Save</a>
+                    {% endif %}
+                    {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-sm btn-outline-secondary" title="Login to save">Save</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center" role="alert">
+            <h4 class="alert-heading">No articles found!</h4>
+            <p>Try adjusting your search or category filter, or run the management command to fetch news:</p>
+            <code>python manage.py fetch_feeds</code>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+<nav aria-label="Page navigation" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+                href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Previous</a>
+        </li>
+        {% endif %}
+
+        <li class="page-item disabled">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+                href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Next</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endblock %}

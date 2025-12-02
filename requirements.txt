@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+python-decouple
+requests
+feedparser
+beautifulsoup4
+gunicorn
+psycopg2-binary
+whitenoise
+dj-database-url
+pymongo

@@ -1,0 +1,22 @@
+{
+    "version": 2,
+    "functions": {
+        "news_aggregator/wsgi.py": {
+            "maxDuration": 10
+        }
+    },
+    "routes": [
+        {
+            "src": "/static/(.*)",
+            "dest": "/staticfiles/$1"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "news_aggregator/wsgi.py"
+        }
+    ],
+    "env": {
+        "DEBUG": "False",
+        "ALLOWED_HOSTS": ".vercel.app"
+    }
+}
