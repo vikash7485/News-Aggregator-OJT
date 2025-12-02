@@ -17,10 +17,16 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-producti
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 # ALLOWED_HOSTS - supports both Vercel (.vercel.app) and Render (.onrender.com)
-ALLOWED_HOSTS = config(
+ALLOWED_HOSTS_STR = config(
     'ALLOWED_HOSTS', 
     default='localhost,127.0.0.1,.vercel.app,.onrender.com'
-).split(',')
+)
+# Split and strip whitespace, handle both comma and space separated
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.replace(',', ' ').split() if host.strip()]
+
+# Ensure .onrender.com wildcard is always included for Render deployments
+if '.onrender.com' not in ' '.join(ALLOWED_HOSTS):
+    ALLOWED_HOSTS.append('.onrender.com')
 
 # NewsAPI removed - using local RSS feeds only
 
