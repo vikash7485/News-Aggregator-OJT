@@ -11,6 +11,22 @@ from django.db.models import Q
 from django.utils.dateparse import parse_datetime
 
 def home(request):
+    # Auto-fetch articles if database is empty (only on first request)
+    if News.objects.count() == 0 and not hasattr(request, '_fetch_triggered'):
+        # Trigger fetch in background using threading
+        import threading
+        from django.core.management import call_command
+        
+        def fetch_in_background():
+            try:
+                call_command('fetch_feeds', verbosity=0)
+            except Exception:
+                pass  # Silently fail in background
+        
+        thread = threading.Thread(target=fetch_in_background, daemon=True)
+        thread.start()
+        request._fetch_triggered = True
+    
     category_id = request.GET.get('category')
     search_query = request.GET.get('q')
     

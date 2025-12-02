@@ -49,7 +49,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"No entries found for {source}"))
                     continue
 
-                for entry in feed.entries[:50]: # Fetch up to 50 articles per feed
+                for entry in feed.entries[:20]: # Fetch up to 20 articles per feed (reduced for faster initial fetch)
                     if News.objects.filter(link=entry.link).exists():
                         continue
                     
@@ -98,13 +98,14 @@ class Command(BaseCommand):
                                 break
                     
                     # Method 6: Fetch from article page (for TechCrunch, ESPN, etc.)
-                    if not image_url and entry.link:
+                    # Skip this on first run to speed up - can be done later
+                    if not image_url and entry.link and False:  # Disabled for faster initial fetch
                         try:
                             # Fetch the article page
                             headers = {
                                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                             }
-                            response = requests.get(entry.link, headers=headers, timeout=5)
+                            response = requests.get(entry.link, headers=headers, timeout=3)
                             if response.status_code == 200:
                                 soup = BeautifulSoup(response.content, 'html.parser')
                                 

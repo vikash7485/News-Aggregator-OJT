@@ -3,7 +3,7 @@ services:
     name: news-aggregator
     env: python
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && gunicorn news_aggregator.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: chmod +x start.sh && ./start.sh
     envVars:
       - key: SECRET_KEY
         generateValue: true

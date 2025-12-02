@@ -1,10 +1,6 @@
 {
     "version": 2,
-    "functions": {
-        "news_aggregator/wsgi.py": {
-            "maxDuration": 10
-        }
-    },
+    "buildCommand": "pip install -r requirements.txt && python manage.py collectstatic --noinput",
     "routes": [
         {
             "src": "/static/(.*)",
@@ -12,12 +8,16 @@
         },
         {
             "src": "/(.*)",
-            "dest": "news_aggregator/wsgi.py"
+            "dest": "/api/index.py"
         }
     ],
+    "functions": {
+        "api/index.py": {
+            "maxDuration": 30
+        }
+    },
     "env": {
         "DEBUG": "False",
         "ALLOWED_HOSTS": ".vercel.app,localhost,127.0.0.1"
-    },
-    "buildCommand": "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    }
 }
